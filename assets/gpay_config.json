@@ -1,0 +1,26 @@
+{
+    "apiVersion": 2,
+    "apiVersionMinor": 0,
+    "allowedPaymentMethods": [
+      {
+        "type": "CARD",
+        "parameters": {
+          "allowedAuthMethods": ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+          "allowedCardNetworks": ["MASTERCARD", "VISA"]
+        },
+        "tokenizationSpecification": {
+          "type": "PAYMENT_GATEWAY",
+          "parameters": {
+            "gateway": "stripe",
+            "stripe:version": "2022-08-01",
+            "stripe:publishableKey": "your_stripe_publishable_key"
+          }
+        }
+      }
+    ],
+    "merchantInfo": {
+      "merchantId": "your_merchant_id",
+      "merchantName": "Your Business Name"
+    }
+  }
+      
