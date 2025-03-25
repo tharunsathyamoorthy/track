@@ -2,88 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'billing_screen.dart';
-import 'billing_history_screen.dart';
-import 'paytrack_screen.dart';
-import 'payment_list_screen.dart';
-
-void main() {
-  runApp(const PayTrackApp());
-}
-
-class PayTrackApp extends StatelessWidget {
-  const PayTrackApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PayTrack',
-      theme: ThemeData(primarySwatch: Colors.teal),
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  final int initialIndex;
-  const HomeScreen({super.key, this.initialIndex = 0});
-
-  @override
-  _HomeScreenState createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  late int _selectedIndex;
-  final List<Widget> _pages = [
-    const DashboardScreen(),
-    const BillingScreen(), // ✅ Use alias
-    const BillingHistoryScreen(), // ✅ Use alias
-    const PayTrackScreen(),
-    PaymentListPage(payments: []),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = widget.initialIndex;
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-
-      // Reload Billing History when switching to History tab
-      if (index == 2) {
-        _pages[2] = const BillingHistoryScreen();
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.teal,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: "Dashboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt), label: "Billing"),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
-          BottomNavigationBarItem(icon: Icon(Icons.payment), label: "Payments"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.list), label: "Payment List"),
-        ],
-      ),
-    );
-  }
-}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -120,20 +38,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Dashboard"),
-        backgroundColor: Colors.teal,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _loadPaymentData();
-              });
-            },
-          ),
-        ],
-      ),
+      appBar:
+          AppBar(title: const Text("Dashboard"), backgroundColor: Colors.teal),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -141,6 +47,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Text("Payment Overview",
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
+
+            // 📊 Bar Chart (FIXED)
             Expanded(
               child: BarChart(
                 BarChartData(
@@ -182,7 +90,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+
             const SizedBox(height: 30),
+
+            // 🍩 Pie Chart
             Expanded(
               child: PieChart(
                 PieChartData(

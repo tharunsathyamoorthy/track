@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:billing_app_flutter/screens/billing_history_screen.dart'
-    as history;
+import 'dart:convert';
+import 'billing_history_screen.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -18,17 +16,13 @@ class _BillingScreenState extends State<BillingScreen> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
-
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = TimeOfDay.now();
-
   String? selectedType;
   String? selectedRepeat;
 
   final List<String> types = ["Bills", "Groceries", "Rent", "Subscription"];
   final List<String> repeats = ["Daily", "Weekly", "Monthly", "Yearly"];
-
-  final String apiUrl = "http://10.0.2.2:5000"; // Localhost for emulator
 
   Future<void> _selectDate() async {
     DateTime? picked = await showDatePicker(
@@ -37,7 +31,11 @@ class _BillingScreenState extends State<BillingScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
-    if (picked != null) setState(() => selectedDate = picked);
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
   }
 
   Future<void> _selectTime() async {
@@ -45,70 +43,11 @@ class _BillingScreenState extends State<BillingScreen> {
       context: context,
       initialTime: selectedTime,
     );
-    if (picked != null) setState(() => selectedTime = picked);
-  }
-
-  Future<void> _saveBillingData() async {
-    String customerName = titleController.text.trim();
-    String amountText = amountController.text.trim();
-    String notes = notesController.text.trim();
-
-    if (customerName.isEmpty || amountText.isEmpty) {
-      _showSnackBar("❌ Please enter Customer Name and Amount");
-      return;
+    if (picked != null && picked != selectedTime) {
+      setState(() {
+        selectedTime = picked;
+      });
     }
-
-    double? amount = double.tryParse(amountText);
-    if (amount == null || amount <= 0) {
-      _showSnackBar("❌ Please enter a valid amount");
-      return;
-    }
-
-    Map<String, dynamic> billData = {
-      "customerName": customerName,
-      "amount": amount,
-      "notes": notes,
-      "type": selectedType ?? "Other",
-      "repeat": selectedRepeat ?? "None",
-      "date": DateFormat('yyyy-MM-dd').format(selectedDate),
-      "time": "${selectedTime.hour}:${selectedTime.minute}",
-    };
-
-    await _saveBillingDataLocally(billData);
-
-    try {
-      final response = await http.post(
-        Uri.parse("$apiUrl/api/add-bill"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(billData),
-      );
-
-      if (response.statusCode == 201) {
-        _showSnackBar("✅ Billing data saved successfully");
-        _clearFields();
-      } else {
-        var responseData = jsonDecode(response.body);
-        _showSnackBar(
-            "❌ Failed: ${responseData['message'] ?? 'Unknown error'}");
-      }
-    } catch (e) {
-      _showSnackBar("❌ Error saving billing data: $e");
-    }
-  }
-
-  Future<void> _saveBillingDataLocally(Map<String, dynamic> billData) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> billingHistory = prefs.getStringList('billingHistory') ?? [];
-    billingHistory.add(jsonEncode(billData));
-    await prefs.setStringList('billingHistory', billingHistory);
-  }
-
-  void _viewBillingHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-          builder: (context) => const history.BillingHistoryScreen()),
-    );
   }
 
   void _showQRCode() {
@@ -116,7 +55,9 @@ class _BillingScreenState extends State<BillingScreen> {
     String amount = amountController.text.trim();
 
     if (customerName.isEmpty || amount.isEmpty) {
-      _showSnackBar("❌ Please enter Customer Name and Amount");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter Customer Name and Amount")),
+      );
       return;
     }
 
@@ -137,9 +78,11 @@ class _BillingScreenState extends State<BillingScreen> {
                 size: 200.0,
               ),
               const SizedBox(height: 10),
-              Text("₹$amount",
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                "₹$amount",
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const Text("Scan the QR Code to proceed with payment."),
               const SizedBox(height: 10),
               const Text("UPI ID: tharunsathy@okhdfcbank"),
@@ -147,27 +90,55 @@ class _BillingScreenState extends State<BillingScreen> {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close")),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close"),
+            ),
           ],
         );
       },
     );
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
-  }
+  Future<void> _generateBill() async {
+    String customerName = titleController.text.trim();
+    String amount = amountController.text.trim();
+    String notes = notesController.text.trim();
+    String date = DateFormat('yyyy-MM-dd').format(selectedDate);
+    String time = selectedTime.format(context);
 
-  void _clearFields() {
-    setState(() {
-      titleController.clear();
-      amountController.clear();
-      notesController.clear();
-      selectedType = null;
-      selectedRepeat = null;
-    });
+    if (customerName.isEmpty || amount.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all required fields")),
+      );
+      return;
+    }
+
+    // Generate unique bill number
+    String billNumber = DateTime.now().millisecondsSinceEpoch.toString();
+
+    final bill = {
+      "billNumber": billNumber,
+      "customer": {"name": customerName}, // Fixed customer data structure
+      "totalAmount": amount,
+      "date": date,
+      "time": time,
+      "notes": notes,
+      "type": selectedType ?? "Not specified",
+      "repeat": selectedRepeat ?? "Not specified",
+      "cart": [
+        {"product": "Sample Product", "price": amount} // Placeholder cart data
+      ]
+    };
+
+    final prefs = await SharedPreferences.getInstance();
+    List<String>? history = prefs.getStringList('billingHistory');
+    history = history ?? [];
+    history.add(jsonEncode(bill));
+    await prefs.setStringList('billingHistory', history);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Bill generated successfully!")),
+    );
   }
 
   @override
@@ -186,13 +157,15 @@ class _BillingScreenState extends State<BillingScreen> {
             children: [
               _buildTextField(titleController, "Customer Name"),
               const SizedBox(height: 16),
+              const Text("Date and Time:",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               Row(
                 children: [
                   _buildIconButton(Icons.calendar_today, _selectDate),
                   Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
                   const SizedBox(width: 16),
                   _buildIconButton(Icons.access_time, _selectTime),
-                  Text("${selectedTime.hour}:${selectedTime.minute}"),
+                  Text(selectedTime.format(context)),
                 ],
               ),
               const SizedBox(height: 20),
@@ -210,14 +183,22 @@ class _BillingScreenState extends State<BillingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildActionButton(
-                      "Generate Bill", Colors.green, _saveBillingData),
+                      "Generate Bill", Colors.green, _generateBill),
                   const SizedBox(width: 10),
                   _buildActionButton(
                       "Continue Payment", Colors.blue, _showQRCode),
-                  const SizedBox(width: 10),
-                  _buildActionButton("View Billing History", Colors.orange,
-                      _viewBillingHistory),
                 ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const BillingHistoryScreen()),
+                  );
+                },
+                child: const Text('View Billing History'),
               ),
             ],
           ),
@@ -225,37 +206,49 @@ class _BillingScreenState extends State<BillingScreen> {
       ),
     );
   }
-
-  Widget _buildTextField(TextEditingController controller, String hint,
-      {bool isNumber = false}) {
-    return TextField(
-      controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      decoration:
-          InputDecoration(labelText: hint, border: OutlineInputBorder()),
-    );
-  }
 }
 
-Widget _buildIconButton(IconData icon, VoidCallback onPressed) {
-  return IconButton(icon: Icon(icon, color: Colors.teal), onPressed: onPressed);
-}
-
-Widget _buildActionButton(String label, Color color, VoidCallback onPressed) {
-  return ElevatedButton(
-    style: ElevatedButton.styleFrom(backgroundColor: color),
-    onPressed: onPressed,
-    child: Text(label, style: const TextStyle(color: Colors.white)),
+Widget _buildTextField(TextEditingController controller, String label,
+    {bool isNumber = false}) {
+  return TextField(
+    controller: controller,
+    keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+    decoration: InputDecoration(
+      labelText: label,
+      border: const OutlineInputBorder(),
+    ),
   );
 }
 
-Widget _buildDropdown(String label, String? value, List<String> items,
+Widget _buildDropdown(String label, String? selectedValue, List<String> items,
     ValueChanged<String?> onChanged) {
   return DropdownButtonFormField<String>(
-    value: value,
-    decoration: InputDecoration(labelText: label, border: OutlineInputBorder()),
-    items:
-        items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+    value: selectedValue,
+    decoration: InputDecoration(
+      labelText: label,
+      border: const OutlineInputBorder(),
+    ),
+    items: items
+        .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+        .toList(),
     onChanged: onChanged,
+  );
+}
+
+Widget _buildIconButton(IconData icon, VoidCallback onPressed) {
+  return IconButton(
+    icon: Icon(icon, color: Colors.blueAccent),
+    onPressed: onPressed,
+  );
+}
+
+Widget _buildActionButton(String text, Color color, VoidCallback onPressed) {
+  return ElevatedButton(
+    onPressed: onPressed,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    ),
+    child: Text(text, style: const TextStyle(color: Colors.white)),
   );
 }
